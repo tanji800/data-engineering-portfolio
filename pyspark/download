@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+.idea/
+.vscode/
+.DS_Store
+output/*
+!output/.gitkeep
+data/*
+!data/.gitkeep
+.sparkStaging/
+metastore_db/
+spark-warehouse/

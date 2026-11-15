@@ -1,0 +1,140 @@
+# PySpark Advanced Engineering
+
+A hands-on, independently developed PySpark portfolio demonstrating advanced DataFrame engineering, analytical transformations, joins, data quality, and performance optimization.
+
+> **Data:** All examples use synthetic e-commerce data generated locally. No employer data, credentials, internal endpoints, or proprietary code are included.
+
+## What this project demonstrates
+
+- DataFrame transformations and expressions
+- Latest-record deduplication using `row_number`
+- Analytical windows: running totals, rank, and moving averages
+- Broadcast joins and join strategy inspection
+- Null handling and data-quality checks
+- Partitioning, repartitioning, and coalescing
+- Cache/persist lifecycle
+- Explain plans and Spark UI-oriented performance investigation
+- Parquet output and reproducible local execution
+- Unit tests for transformation logic
+
+## Project structure
+
+```text
+pyspark-advanced-engineering/
+├── README.md
+├── requirements.txt
+├── .gitignore
+├── run.py
+├── data/
+│   └── .gitkeep
+├── output/
+│   └── .gitkeep
+├── src/
+│   └── pyspark_advanced/
+│       ├── __init__.py
+│       ├── sample_data.py
+│       ├── transformations.py
+│       ├── quality.py
+│       └── pipeline.py
+└── tests/
+    ├── conftest.py
+    ├── test_transformations.py
+    └── test_quality.py
+```
+
+## Requirements
+
+- Python 3.10 or 3.11
+- Java 11 or 17 (compatible with the selected Spark distribution)
+- PySpark 3.5.x
+- Pytest
+
+Install:
+
+```bash
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate
+# macOS/Linux:
+source .venv/bin/activate
+
+pip install -e .
+```
+
+## Run the pipeline
+
+From the repository root:
+
+```bash
+python run.py
+```
+
+The pipeline creates synthetic customers, orders, and order-event records, then:
+
+1. Validates required fields and business rules.
+2. Keeps the latest event for each order.
+3. Joins orders to customer attributes using a broadcast join.
+4. Calculates customer-level running spend and order rankings.
+5. Writes curated results as Parquet.
+6. Prints the physical plan for inspection.
+
+Output is written to `output/curated_orders/`.
+
+## Run tests
+
+```bash
+pytest -q
+```
+
+## Key implementation notes
+
+### 1. Latest-record deduplication
+
+`latest_order_events()` uses a window partitioned by `order_id`, ordered by `event_timestamp` and a deterministic tie-breaker. This is preferable to a plain `dropDuplicates(["order_id"])` when the requirement is to retain the latest record.
+
+### 2. Analytical windows
+
+`add_customer_metrics()` demonstrates:
+- Running customer spend ordered by order date.
+- Order sequence per customer.
+- Customer-level ranking by order value.
+
+The running total uses an explicit row-based window frame to avoid relying on implicit frame defaults.
+
+### 3. Join strategy
+
+The sample pipeline uses `broadcast(customers)` because the generated customer dimension is intentionally small. Broadcasting is not universally faster: use it only when the dimension is suitably small for executor memory and verify the plan.
+
+### 4. Partitioning
+
+`repartition()` increases or redistributes partitions and causes a shuffle. `coalesce()` can reduce partitions with fewer shuffle costs, but may produce uneven partitions. Choose based on data size and downstream workload, not by habit.
+
+### 5. Caching
+
+The pipeline demonstrates `cache()` and `unpersist()`. Cache only when a DataFrame is reused and the saved recomputation cost justifies memory/storage pressure.
+
+### 6. Explain plans and tuning
+
+The pipeline prints `explain("formatted")`. Inspect:
+- Exchange nodes (shuffle boundaries)
+- BroadcastHashJoin vs SortMergeJoin
+- Partition filters and predicate pushdown
+- Unnecessary scans and repeated transformations
+
+Do not assume an optimization worked simply because a hint was added; verify the executed plan and measure runtime on representative data.
+
+## Example business scenario
+
+An e-commerce platform receives multiple updates for each order. The pipeline must select the latest order state, enrich it with customer attributes, and calculate customer spending metrics for analytics.
+
+## Suggested extensions
+
+- Add incremental processing with event-time watermarks using Structured Streaming.
+- Add schema evolution and Delta Lake tables in a separate optional module.
+- Add skewed-key test data and compare join strategies.
+- Add configurable input/output paths and Spark settings.
+- Add data-quality metrics and a reject/quarantine dataset.
+
+## Disclaimer
+
+This repository is an educational portfolio project using synthetic data. It is not affiliated with or representative of any employer's internal systems.
